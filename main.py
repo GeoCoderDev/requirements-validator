@@ -1,9 +1,23 @@
 import unicodedata
 import spacy
+import os
 from typing import List, Dict
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+import secrets
+
+# Cargar variables de entorno
+load_dotenv()
+
+# Generar un token estático si no existe
+API_TOKEN = os.getenv('API_TOKEN')
+if not API_TOKEN:
+    API_TOKEN = secrets.token_hex(16)
+    # Guardar en un archivo .env para persistencia
+    with open('.env', 'a') as f:
+        f.write(f"\nAPI_TOKEN={API_TOKEN}")
 
 class AdvancedRequirementValidator:
     def __init__(self):
@@ -142,21 +156,38 @@ class RequirementRequest(BaseModel):
 # Inicializar validador
 validator = AdvancedRequirementValidator()
 
+def verify_token(authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Token no proporcionado o formato incorrecto")
+
+    # Extraer el token después de "Bearer "
+    token = authorization.split(" ")[1]
+
+    # Comparar con el token esperado
+    if token != API_TOKEN:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
+
 @app.post("/validate-requirement")
-async def validate_requirement(request: RequirementRequest):
-    try:
-        result = validator.validate_requirement(
-            request.requirement, 
-            request.is_functional
-        )
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+async def validate_requirement(request: RequirementRequest, authorization: str = Header(None)):
+    # Verificar el token
+    verify_token(authorization)
+
+    result = validator.validate_requirement(
+        request.requirement, 
+        request.is_functional
+    )
+    return result
+
 
 @app.get("/")
-async def root():
+async def root(token: str = Header(None)):
+    # Verificar token incluso en la raíz
+    verify_token(token)
+    
     return {
         "message": "Requirement Validator API",
         "status": "✅ Online",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "token_status": "Autenticado correctamente"
     }
