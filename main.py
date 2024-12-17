@@ -13,11 +13,6 @@ load_dotenv()
 
 # Generar un token estático si no existe
 API_TOKEN = os.getenv('API_TOKEN')
-if not API_TOKEN:
-    API_TOKEN = secrets.token_hex(16)
-    # Guardar en un archivo .env para persistencia
-    with open('.env', 'a') as f:
-        f.write(f"\nAPI_TOKEN={API_TOKEN}")
 
 class AdvancedRequirementValidator:
     def __init__(self):
